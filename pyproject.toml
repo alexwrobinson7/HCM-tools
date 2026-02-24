@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "hcm-tools"
+version = "0.1.0"
+description = "RPA tool for bulk file downloads from enterprise HRIS portals"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.44.0",
+    "pyyaml>=6.0",
+    "click>=8.1.0",
+]
+
+[project.scripts]
+hcm-tools = "hcm_tools.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hcm_tools*"]

@@ -1,0 +1,38 @@
+name: ADP Vantage
+base_url: "https://vantage.adp.com"
+login_url: "https://vantage.adp.com/portal/signin"
+
+# Navigate here after login — update to the exact documents URL for your org
+documents_url: "https://vantage.adp.com/portal/documents"
+
+selectors:
+  document_list:
+    # Container wrapping the full document table/list
+    container: "[data-testid='document-list'], .document-list-container"
+    # Each individual document row
+    rows: ".document-row, tr.document-item"
+    # The clickable download button/link within a row
+    download_button: "button[aria-label*='Download'], a[aria-label*='Download'], a[href*='download']"
+    # Metadata fields within each row — update after inspecting your portal's DOM
+    employee_name: ".employee-name, [data-field='employeeName']"
+    employee_id:   ".employee-id,   [data-field='employeeId']"
+    doc_type:      ".doc-type,      [data-field='documentType']"
+    doc_date:      ".doc-date,      [data-field='documentDate']"
+
+  pagination:
+    next_button:    "button[aria-label='Next page'], button.pagination-next"
+    page_indicator: ".pagination-info, [aria-label*='Page']"
+    # Has-next check — selector must not match when button is disabled
+    has_next: "button[aria-label='Next page']:not([disabled]), button.pagination-next:not([disabled])"
+
+download:
+  # Random delay between downloads (seconds) — avoids rate limiting
+  delay_min: 2.0
+  delay_max: 4.5
+  # Playwright navigation/download timeout (ms)
+  timeout: 30000
+
+output:
+  directory: "output/adp_vantage"
+  # Tokens available: {employee_id}, {employee_name}, {doc_type}, {date}
+  filename_template: "{employee_id}_{employee_name}_{doc_type}_{date}"

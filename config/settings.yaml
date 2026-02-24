@@ -1,0 +1,21 @@
+# Global settings — overridden by per-system config where both define the same key
+
+browser:
+  headless: false        # Must be false so you can see the login window
+  slow_mo: 50            # ms delay between Playwright actions (helps with flaky portals)
+  viewport:
+    width: 1280
+    height: 900
+
+logging:
+  level: INFO            # DEBUG for verbose output
+  log_dir: logs
+
+# Default download behaviour (overridden per system)
+download:
+  delay_min: 2.0
+  delay_max: 4.5
+  timeout: 30000
+
+output:
+  base_dir: output

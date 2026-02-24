@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Downloaded files — never commit real employee documents
+output/
+!output/.gitkeep
+
+# Logs and state
+logs/
+!logs/.gitkeep
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Playwright browser binaries (installed via playwright install)
+/ms-playwright/
