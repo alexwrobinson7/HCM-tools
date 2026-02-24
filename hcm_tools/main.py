@@ -9,8 +9,9 @@ import click
 import yaml
 
 from .core.browser import BrowserSession
+from .core.db import DownloadDB
 from .core.downloader import BulkDownloader
-from .core.state import DownloadState
+from .core.reporter import generate_report, print_summary
 from .adapters import REGISTRY
 
 
@@ -30,11 +31,14 @@ def _setup_logging(log_dir: str, level: str) -> None:
     log_path.mkdir(parents=True, exist_ok=True)
     numeric = getattr(logging, level.upper(), logging.INFO)
     fmt = "%(asctime)s [%(levelname)-8s] %(name)s — %(message)s"
-    handlers: list = [
-        logging.StreamHandler(),
-        logging.FileHandler(log_path / "hcm_tools.log"),
-    ]
-    logging.basicConfig(level=numeric, format=fmt, handlers=handlers)
+    logging.basicConfig(
+        level=numeric,
+        format=fmt,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_path / "hcm_tools.log"),
+        ],
+    )
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -57,20 +61,27 @@ def _setup_logging(log_dir: str, level: str) -> None:
     help="Override the output directory from config.",
 )
 @click.option(
+    "--workers", "-w",
+    default=None,
+    type=int,
+    metavar="N",
+    help="Number of concurrent download workers (overrides config).",
+)
+@click.option(
     "--resume",
     is_flag=True,
-    help="Resume from the last saved page instead of starting over.",
+    help="Resume from the last page saved in the database.",
 )
 @click.option(
     "--reset-state",
     is_flag=True,
-    help="Wipe saved state and start a fresh run.",
+    help="Wipe the database and start a completely fresh run.",
 )
 @click.option(
     "--log-dir",
     default="logs",
     show_default=True,
-    help="Directory for log files.",
+    help="Directory for log files and the SQLite database.",
 )
 @click.option(
     "--log-level",
@@ -78,24 +89,26 @@ def _setup_logging(log_dir: str, level: str) -> None:
     show_default=True,
     type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR"], case_sensitive=False),
 )
-def cli(system, config, output, resume, reset_state, log_dir, log_level):
+def cli(system, config, output, workers, resume, reset_state, log_dir, log_level):
     """
-    HCM Tools — automated bulk document downloader for enterprise HRIS portals.
+    HCM Tools — concurrent bulk document downloader for enterprise HRIS portals.
 
     \b
-    Example:
+    Examples:
         hcm-tools --system adp_vantage
         hcm-tools --system adp_vantage --resume
-        hcm-tools --system adp_vantage --output /tmp/docs --log-level DEBUG
+        hcm-tools --system adp_vantage --workers 5 --output /tmp/docs
+        hcm-tools --system adp_vantage --reset-state --log-level DEBUG
     """
     _setup_logging(log_dir, log_level)
-    asyncio.run(_run(system, config, output, resume, reset_state, log_dir))
+    asyncio.run(_run(system, config, output, workers, resume, reset_state, log_dir))
 
 
 async def _run(
     system: str,
     config_path: str | None,
     output_override: str | None,
+    workers_override: int | None,
     resume: bool,
     reset_state: bool,
     log_dir: str,
@@ -106,48 +119,58 @@ async def _run(
 
     if output_override:
         config.setdefault("output", {})["directory"] = output_override
+    if workers_override is not None:
+        config.setdefault("concurrency", {})["workers"] = workers_override
 
-    state_file = Path(log_dir) / f"{system}_state.json"
-    state = DownloadState(str(state_file), system=system)
+    db_path = str(Path(log_dir) / f"{system}.db")
+    db = DownloadDB(db_path)
+    await db.open()
 
-    if reset_state:
-        state.reset()
-        logger.info("State reset — starting fresh.")
+    try:
+        if reset_state:
+            await db.reset()
+            logger.info("Database state reset — starting fresh.")
 
-    start_page = state.last_page if resume else 1
-    if resume:
-        logger.info(f"Resuming from page {start_page}")
+        start_page = (await db.get_last_page()) if resume else 1
+        if resume:
+            logger.info(f"Resuming from listing page {start_page}")
 
-    browser_cfg = config.get("browser", {})
+        browser_cfg = config.get("browser", {})
 
-    async with BrowserSession(
-        headless=browser_cfg.get("headless", False),
-        slow_mo=browser_cfg.get("slow_mo", 50),
-        viewport=browser_cfg.get("viewport"),
-    ) as session:
-        AdapterClass = REGISTRY[system]
-        adapter = AdapterClass(config, session.page)
+        async with BrowserSession(
+            headless=browser_cfg.get("headless", False),
+            slow_mo=browser_cfg.get("slow_mo", 50),
+            viewport=browser_cfg.get("viewport"),
+        ) as session:
+            AdapterClass = REGISTRY[system]
 
-        # 1. Go to login page
-        login_url = config.get("login_url") or config["base_url"]
-        await session.navigate(login_url)
+            # The scraping adapter uses the main (login) page
+            scrape_adapter = AdapterClass(config, session.page)
 
-        # 2. Wait for human to authenticate
-        await session.pause_for_login()
+            # Navigate to login
+            login_url = config.get("login_url") or config["base_url"]
+            await session.navigate(login_url)
 
-        # 3. Navigate to documents listing
-        await adapter.navigate_to_documents()
+            # Wait for human authentication
+            await session.pause_for_login()
 
-        # 4. Run bulk download
-        downloader = BulkDownloader(adapter, state, config)
-        downloaded, skipped, failed = await downloader.run(start_page=start_page)
+            # Hand off to the concurrent downloader
+            downloader = BulkDownloader(
+                adapter_class=AdapterClass,
+                scrape_adapter=scrape_adapter,
+                context=session.context,
+                db=db,
+                config=config,
+            )
+            await downloader.run(start_page=start_page)
 
-    click.echo(
-        f"\nRun complete — downloaded: {downloaded}, "
-        f"skipped: {skipped}, failed: {failed}"
-    )
-    if failed:
-        click.echo(f"Check {log_dir}/{system}_state.json for failed document IDs.")
+        # Generate and print the summary report
+        output_dir = config.get("output", {}).get("directory", "output")
+        summary = await generate_report(db, output_dir, system)
+        print_summary(summary)
+
+    finally:
+        await db.close()
 
 
 if __name__ == "__main__":

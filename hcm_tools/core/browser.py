@@ -64,6 +64,17 @@ class BrowserSession:
             raise RuntimeError("BrowserSession not started — use as async context manager.")
         return self._page
 
+    @property
+    def context(self) -> BrowserContext:
+        """The shared browser context — used to spawn additional worker pages."""
+        if self._context is None:
+            raise RuntimeError("BrowserSession not started — use as async context manager.")
+        return self._context
+
+    async def new_page(self) -> Page:
+        """Create a new page within the shared context (inherits session cookies)."""
+        return await self.context.new_page()
+
     async def navigate(self, url: str, wait_until: str = "domcontentloaded") -> None:
         logger.info(f"Navigating to {url}")
         await self.page.goto(url, wait_until=wait_until)

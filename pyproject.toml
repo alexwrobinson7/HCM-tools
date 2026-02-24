@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "hcm-tools"
-version = "0.1.0"
+version = "0.2.0"
 description = "RPA tool for bulk file downloads from enterprise HRIS portals"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,7 @@ dependencies = [
     "playwright>=1.44.0",
     "pyyaml>=6.0",
     "click>=8.1.0",
+    "aiosqlite>=0.20.0",
 ]
 
 [project.scripts]

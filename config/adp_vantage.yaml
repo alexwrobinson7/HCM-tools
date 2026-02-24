@@ -41,10 +41,42 @@ selectors:
     # Has-next check — selector must not match when button is disabled
     has_next: "button[aria-label='Next page']:not([disabled]), button.pagination-next:not([disabled])"
 
+browser:
+  headless: false       # Must be false so you can see the login window
+  slow_mo: 50           # ms delay between Playwright actions
+
+# ── Concurrent workers ──────────────────────────────────────────────────────
+# Each worker gets its own browser page (inheriting the session cookies).
+# Start low and increase if the portal handles concurrent requests well.
+concurrency:
+  workers: 2            # Number of parallel download workers
+
+# ── Rate limiting ───────────────────────────────────────────────────────────
+# Sliding-window limit shared across all workers.
+# Lower this if you see CAPTCHA challenges or HTTP 429 responses.
+rate_limit:
+  downloads_per_minute: 20
+
+# ── Retry / exponential backoff ─────────────────────────────────────────────
+retry:
+  max_attempts: 3       # Total attempts per document (1 = no retry)
+  base_delay:   2.0     # Initial wait (seconds) before first retry
+  max_delay:    60.0    # Cap on backoff delay (seconds)
+
+# ── Session timeout detection ───────────────────────────────────────────────
+# URL fragments that indicate the session expired and a login redirect occurred.
+session:
+  expired_indicators:
+    - "/signin"
+    - "/login"
+    - "/sso"
+    - "auth/"
+    - "adfs/"
+
 download:
-  # Random delay between downloads (seconds) — avoids rate limiting
-  delay_min: 2.0
-  delay_max: 4.5
+  # Random jitter between downloads per worker (seconds) — avoids bursty patterns
+  delay_min: 1.5
+  delay_max: 3.5
   # Playwright navigation/download timeout (ms)
   timeout: 30000
 
