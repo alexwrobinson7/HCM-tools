@@ -2,6 +2,22 @@ name: ADP Vantage
 base_url: "https://vantage.adp.com"
 login_url: "https://vantage.adp.com/portal/signin"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# IMPORTANT: Before running, update the selectors below to match your portal.
+#
+# How to find the real selectors:
+#   1. Log in to your ADP Vantage portal in Chrome/Edge.
+#   2. Navigate to the document listing page.
+#   3. Right-click a document row → Inspect.
+#   4. In DevTools, hover over elements to identify the CSS classes / attributes
+#      for each field (employee name, ID, doc type, date, download button).
+#   5. Replace the placeholder selectors below with what you find.
+#   6. Also update documents_url to the exact URL of the listing page.
+#
+# Tip: Use the DevTools console to test a selector before updating this file:
+#   document.querySelectorAll('<your-selector>')
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Navigate here after login — update to the exact documents URL for your org
 documents_url: "https://vantage.adp.com/portal/documents"
 
@@ -9,11 +25,11 @@ selectors:
   document_list:
     # Container wrapping the full document table/list
     container: "[data-testid='document-list'], .document-list-container"
-    # Each individual document row
+    # Each individual document row — VERIFY THIS MATCHES YOUR PORTAL
     rows: ".document-row, tr.document-item"
-    # The clickable download button/link within a row
+    # The clickable download button/link within a row — VERIFY THIS MATCHES YOUR PORTAL
     download_button: "button[aria-label*='Download'], a[aria-label*='Download'], a[href*='download']"
-    # Metadata fields within each row — update after inspecting your portal's DOM
+    # Metadata fields within each row — VERIFY THESE MATCH YOUR PORTAL
     employee_name: ".employee-name, [data-field='employeeName']"
     employee_id:   ".employee-id,   [data-field='employeeId']"
     doc_type:      ".doc-type,      [data-field='documentType']"
